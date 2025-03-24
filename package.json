@@ -3,10 +3,26 @@
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
   "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "icon": "images/icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/file-length-lint"
+  },
+  "license": "MIT",
+  "keywords": [
+    "lint",
+    "linter",
+    "file-length",
+    "code-quality",
+    "best-practices"
+  ],
   "engines": {
     "vscode": "^1.98.0"
   },
   "categories": [
+    "Linters",
+    "Formatters",
     "Other"
   ],
   "activationEvents": [
@@ -14,6 +30,12 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "fileLengthLint.scanWorkspace",
+        "title": "File Length Lint: Scan Workspace"
+      }
+    ],
     "configuration": {
       "title": "File Length Lint",
       "properties": {
@@ -22,6 +44,17 @@
           "default": 300,
           "minimum": 1,
           "description": "Maximum number of lines allowed in a file before showing a lint error"
+        },
+        "fileLengthLint.languageSpecificMaxLines": {
+          "type": "object",
+          "default": {
+            "javascript": 500,
+            "typescript": 500,
+            "markdown": 1000,
+            "json": 5000,
+            "html": 800
+          },
+          "description": "Language-specific maximum line counts. Overrides the global maxLines setting for specified languages."
         },
         "fileLengthLint.enabled": {
           "type": "boolean",
@@ -34,38 +67,48 @@
             "**/.git/**",
             "**/node_modules/**",
             "**/dist/**",
-            "**/out/**"
+            "**/out/**",
+            "**/bin/**",
+            "**/obj/**",
+            "**/.vs/**",
+            "**/.idea/**",
+            "**/*.min.js",
+            "**/*.min.css",
+            "**/*.dll",
+            "**/*.exe",
+            "**/*.png",
+            "**/*.jpg",
+            "**/*.jpeg",
+            "**/*.gif",
+            "**/*.ico",
+            "**/*.svg",
+            "**/*.woff",
+            "**/*.woff2",
+            "**/*.ttf",
+            "**/*.eot",
+            "**/*.pdf",
+            "**/*.zip",
+            "**/*.tar",
+            "**/*.gz",
+            "**/*.7z"
           ],
           "description": "Glob patterns to exclude from file length linting"
-        },
-        "fileLengthLint.include": {
-          "type": "array",
-          "default": [
-            "**/*"
-          ],
-          "description": "Glob patterns to include in file length linting"
         },
         "fileLengthLint.respectGitignore": {
           "type": "boolean",
           "default": true,
           "description": "Respect .gitignore files when scanning for files to lint"
         },
-        "fileLengthLint.backgroundScanEnabled": {
+        "fileLengthLint.realtimeScanningEnabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable background scanning of files in the workspace"
+          "description": "Enable real-time scanning of files in the workspace"
         },
-        "fileLengthLint.backgroundScanIntervalMinutes": {
-          "type": "number",
-          "default": 30,
-          "minimum": 5,
-          "description": "Interval in minutes between background scans of the workspace"
-        },
-        "fileLengthLint.maxFilesPerScan": {
-          "type": "number",
-          "default": 100,
-          "minimum": 10,
-          "description": "Maximum number of files to scan in a single background scan batch to limit resource usage"
+
+        "fileLengthLint.customQuickFixMessage": {
+          "type": "string",
+          "default": "",
+          "description": "Custom message to append to the quick fix suggestion. For example: 'Please consider refactoring this file according to our team guidelines.'"
         }
       }
     }
