@@ -74,22 +74,6 @@ This extension contributes the following settings:
 
 Excessively long files can be difficult to navigate, understand, and maintain. By setting a maximum line count for your files, you can encourage better code organization and modularization. This extension helps enforce these best practices by providing immediate feedback when files grow too large.
 
-## Release Notes
-
-### 0.0.1
-
-Initial release of File Length Lint
-
-- Basic functionality to check file line counts
-- Configurable maximum line count with language-specific settings
-- Status bar indicator showing current file's line count
-- On-demand workspace scanning command
-- Quick fix suggestions for splitting large files
-- Include/exclude patterns
-- Background file scanning
-- .gitignore support
-- Error reporting in Problems panel
-
 ## Contributing
 
 Contributions are welcome! Feel free to submit issues or pull requests on the GitHub repository.
