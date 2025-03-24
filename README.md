@@ -44,11 +44,19 @@ The extension works in several ways:
 
 1. **Active file checking**: When you open or save a file, the extension immediately counts the number of lines in the file. If the line count exceeds the configured maximum, a problem is reported in the VS Code Problems panel.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Pimzino/file-length-lint/main/images/problemstab.gif" width="700" alt="Problems tab showing file length lint errors">
+</p>
+
 2. **Real-time scanning**: The extension scans files in your workspace in real-time using multi-threading to find files that exceed the maximum line count. This happens without requiring you to open the files, ensuring all problematic files are identified efficiently.
 
 3. **Status bar indicator**: The extension shows the current file's line count in the status bar, along with the maximum allowed for that file type. The indicator turns red when the file exceeds the limit.
 
 4. **Quick fix suggestions**: When a file exceeds the maximum line count, you can use the quick fix feature to get suggestions on how to split the file into smaller, more manageable pieces.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Pimzino/file-length-lint/main/images/quickfixsuggestions.gif" width="700" alt="Quick fix suggestions for splitting large files">
+</p>
 
 ## Extension Settings
 
