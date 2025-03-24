@@ -17,6 +17,9 @@
   <a href="https://github.com/Pimzino/file-length-lint/releases">
     <img src="https://img.shields.io/github/v/release/Pimzino/file-length-lint.svg" alt="GitHub release">
   </a>
+</p>
+
+<p align="center">
   <a href="https://www.buymeacoffee.com/pimzino">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="30">
   </a>
