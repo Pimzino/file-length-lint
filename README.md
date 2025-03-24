@@ -14,9 +14,6 @@
   <a href="https://github.com/Pimzino/file-length-lint/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Pimzino/file-length-lint.svg" alt="License">
   </a>
-  <a href="https://github.com/Pimzino/file-length-lint/releases">
-    <img src="https://img.shields.io/github/v/release/Pimzino/file-length-lint.svg" alt="GitHub release">
-  </a>
 </p>
 
 <p align="center">

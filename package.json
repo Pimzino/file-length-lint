@@ -2,7 +2,7 @@
   "name": "file-length-lint",
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Pimzino",
   "icon": "images/icon.png",
   "repository": {
@@ -18,7 +18,7 @@
     "best-practices"
   ],
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Linters",
@@ -130,7 +130,7 @@
     "ignore": "^5.3.1"
   },
   "devDependencies": {
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "^1.93.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/minimatch": "^5.1.2",
