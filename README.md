@@ -17,7 +17,7 @@ A lightweight VS Code extension that checks the number of lines in your files an
 - Customizable exclude patterns with sensible defaults for binary files and build outputs
 - Real-time scanning of files using multi-threading for better performance
 - Respects .gitignore files (can be disabled) with real-time updates when files change
-- Immediately applies changes to exclusion settings without requiring a reload
+- Immediately applies changes to exclusion settings and .gitignore files without requiring a reload
 - Minimal performance impact with optimized file processing
 
 ## How It Works
@@ -39,7 +39,7 @@ This extension contributes the following settings:
 * `fileLengthLint.maxLines`: Maximum number of lines allowed in a file before showing a lint error (default: 300)
 * `fileLengthLint.languageSpecificMaxLines`: Language-specific maximum line counts that override the global setting (default: { "javascript": 500, "typescript": 500, "markdown": 1000, "json": 5000, "html": 800 })
 * `fileLengthLint.enabled`: Enable or disable file length linting (default: true)
-* `fileLengthLint.exclude`: Glob patterns to exclude from file length linting. By default, excludes common binary files, build outputs, and version control directories.
+* `fileLengthLint.exclude`: Glob patterns to exclude from file length linting. Supports patterns like `**/*.dll` (all .dll files in any directory) or `*.dll` (any .dll file). By default, excludes common binary files, build outputs, and version control directories.
 * `fileLengthLint.respectGitignore`: Respect .gitignore files when scanning for files to lint (default: true)
 * `fileLengthLint.realtimeScanningEnabled`: Enable real-time scanning of files in the workspace (default: true)
 * `fileLengthLint.customQuickFixMessage`: Custom message to append to the diagnostic and quick fix suggestion (default: ""). For example: "Please consider refactoring this file according to our team guidelines." This message will appear in the Problems panel, in the quick fix suggestion, and in the information message when using the quick fix.

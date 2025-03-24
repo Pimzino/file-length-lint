@@ -34,6 +34,10 @@
       {
         "command": "fileLengthLint.scanWorkspace",
         "title": "File Length Lint: Scan Workspace"
+      },
+      {
+        "command": "fileLengthLint.resetSettings",
+        "title": "File Length Lint: Reset All Settings to Defaults"
       }
     ],
     "configuration": {

@@ -121,18 +121,55 @@ function handleGitignoreChange(uri: vscode.Uri) {
 		// Clear the cache for this workspace folder
 		gitignoreCache.delete(workspaceFolder.uri.fsPath);
 
-		// Re-scan workspace files if real-time scanning is enabled
-		if (getConfig().realtimeScanningEnabled) {
-			scanWorkspaceFiles();
+		// Get the configuration
+		const config = getConfig(true);
+
+		// Only proceed if the extension is enabled and respects gitignore
+		if (!config.enabled || !config.respectGitignore) {
+			return;
 		}
+
+		console.log('.gitignore file changed - updating diagnostics');
+
+		// Clear all existing diagnostics first
+		diagnosticCollection.clear();
+
+		// Terminate any running worker threads
+		terminateWorkers();
+
+		// Show a notification that we're updating
+		vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: 'File Length Lint: Updating with new .gitignore patterns...',
+			cancellable: false
+		}, async (progress) => {
+			progress.report({ increment: 0 });
+
+			// Lint open files immediately with the new configuration
+			await lintOpenFiles(true);
+
+			// Re-scan workspace if real-time scanning is enabled
+			if (config.realtimeScanningEnabled) {
+				await scanWorkspaceFiles(true);
+			}
+
+			progress.report({ increment: 100 });
+			return;
+		});
 	}
 }
 
 /**
  * Activate the extension
  */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 	console.log('File Length Lint extension is now active');
+
+	// Validate and restore any missing settings before initializing
+	const settingsRestored = await validateAndRestoreSettings();
+	if (settingsRestored) {
+		console.log('File Length Lint: Restored missing settings');
+	}
 
 	// Create a diagnostic collection for our extension
 	diagnosticCollection = vscode.languages.createDiagnosticCollection('fileLengthLint');
@@ -189,6 +226,48 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		});
 	});
+
+	// Register a command to reset all settings to defaults
+	const resetSettingsCommand = vscode.commands.registerCommand('fileLengthLint.resetSettings', async () => {
+		const resetAction = 'Reset All Settings';
+		const cancelAction = 'Cancel';
+
+		const result = await vscode.window.showWarningMessage(
+			'This will reset all File Length Lint settings to their default values. Are you sure you want to continue?',
+			{ modal: true },
+			resetAction,
+			cancelAction
+		);
+
+		if (result === resetAction) {
+			// Get the configuration
+			const config = vscode.workspace.getConfiguration('fileLengthLint');
+
+			// Reset all settings to defaults
+			await config.update('maxLines', DEFAULT_CONFIG.maxLines, vscode.ConfigurationTarget.Global);
+			await config.update('languageSpecificMaxLines', DEFAULT_CONFIG.languageSpecificMaxLines, vscode.ConfigurationTarget.Global);
+			await config.update('enabled', DEFAULT_CONFIG.enabled, vscode.ConfigurationTarget.Global);
+			await config.update('exclude', DEFAULT_CONFIG.exclude, vscode.ConfigurationTarget.Global);
+			await config.update('respectGitignore', DEFAULT_CONFIG.respectGitignore, vscode.ConfigurationTarget.Global);
+			await config.update('realtimeScanningEnabled', DEFAULT_CONFIG.realtimeScanningEnabled, vscode.ConfigurationTarget.Global);
+			await config.update('customQuickFixMessage', DEFAULT_CONFIG.customQuickFixMessage, vscode.ConfigurationTarget.Global);
+
+			// Show a notification that settings were reset
+			const viewSettings = 'View Settings';
+			vscode.window.showInformationMessage('File Length Lint: All settings have been reset to defaults.', viewSettings)
+				.then(selection => {
+					if (selection === viewSettings) {
+						vscode.commands.executeCommand('workbench.action.openSettings', 'fileLengthLint');
+					}
+				});
+
+			// Re-scan workspace with new settings
+			await lintOpenFiles(true);
+			if (DEFAULT_CONFIG.realtimeScanningEnabled) {
+				await scanWorkspaceFiles(true);
+			}
+		}
+	});
 	// Register the suggest file split command
 	const suggestFileSplitCommand = vscode.commands.registerCommand('fileLengthLint.suggestFileSplit', async (uri: vscode.Uri) => {
 		const document = await vscode.workspace.openTextDocument(uri);
@@ -231,7 +310,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
-	context.subscriptions.push(scanWorkspaceCommand, suggestFileSplitCommand, codeActionProvider);
+	context.subscriptions.push(scanWorkspaceCommand, resetSettingsCommand, suggestFileSplitCommand, codeActionProvider);
 
 	// Register event handlers
 	context.subscriptions.push(
@@ -252,42 +331,85 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.workspace.onDidCloseTextDocument(document => {
 			// Remove from open files set
 			openFiles.delete(document.uri.fsPath);
-			// Clear diagnostics
-			diagnosticCollection.delete(document.uri);
+			// Don't clear diagnostics when a file is closed
+			// This allows problems to remain visible in the Problems tab
 		}),
 
 		// Re-lint all files when configuration changes
-		vscode.workspace.onDidChangeConfiguration(event => {
+		vscode.workspace.onDidChangeConfiguration(async event => {
 			if (event.affectsConfiguration('fileLengthLint')) {
 				console.log('File Length Lint configuration changed');
 
-				// Check which specific setting changed
-				const settingsToCheck = [
-					'fileLengthLint.exclude',
-					'fileLengthLint.respectGitignore',
-					'fileLengthLint.realtimeScanningEnabled',
-					'fileLengthLint.enabled'
-				];
+				// Check if any critical settings were deleted and restore them if needed
+				const settingsRestored = await validateAndRestoreSettings(false);
+				if (settingsRestored) {
+					console.log('File Length Lint: Restored missing settings after configuration change');
+					// Show a notification that settings were restored
+					const message = 'File Length Lint: Some settings were missing and have been restored to defaults.';
+					const viewSettings = 'View Settings';
 
-				// Check if exclusion settings changed
-				const exclusionsChanged = settingsToCheck.some(setting => event.affectsConfiguration(setting));
-
-				// Clear the gitignore cache when configuration changes
-				if (event.affectsConfiguration('fileLengthLint.respectGitignore')) {
-					console.log('Clearing gitignore cache due to configuration change');
-					gitignoreCache.clear();
+					vscode.window.showInformationMessage(message, viewSettings).then(selection => {
+						if (selection === viewSettings) {
+							vscode.commands.executeCommand('workbench.action.openSettings', 'fileLengthLint');
+						}
+					});
 				}
 
-				// Lint open files immediately
-				lintOpenFiles();
+				// Handle exclude pattern changes specifically
+				if (event.affectsConfiguration('fileLengthLint.exclude')) {
+					console.log('Exclusion patterns changed - updating diagnostics');
 
-				// Terminate any running worker threads
-				terminateWorkers();
+					// Get the new configuration with a forced refresh
+					const newConfig = getConfig(true);
 
-				// Re-scan workspace if real-time scanning is enabled and exclusions changed
-				if (getConfig().realtimeScanningEnabled && exclusionsChanged) {
-					console.log('Re-scanning workspace due to exclusion settings change');
-					scanWorkspaceFiles();
+					// Clear all existing diagnostics first
+					diagnosticCollection.clear();
+
+					// Terminate any running worker threads
+					terminateWorkers();
+
+					// Show a notification that we're updating
+					vscode.window.withProgress({
+						location: vscode.ProgressLocation.Notification,
+						title: 'File Length Lint: Applying new exclusion patterns...',
+						cancellable: false
+					}, async (progress) => {
+						progress.report({ increment: 0 });
+
+						// Lint open files immediately with the new configuration
+						await lintOpenFiles(true);
+
+						// Re-scan workspace if real-time scanning is enabled
+						if (newConfig.realtimeScanningEnabled) {
+							await scanWorkspaceFiles(true);
+						}
+
+						progress.report({ increment: 100 });
+						return;
+					});
+				} else {
+					// Handle other configuration changes
+
+					// Clear the gitignore cache when configuration changes
+					if (event.affectsConfiguration('fileLengthLint.respectGitignore')) {
+						console.log('Clearing gitignore cache due to configuration change');
+						gitignoreCache.clear();
+					}
+
+					// Lint open files immediately
+					lintOpenFiles(true);
+
+					// Terminate any running worker threads
+					terminateWorkers();
+
+					// Re-scan workspace if real-time scanning is enabled
+					if (getConfig(true).realtimeScanningEnabled &&
+					    (event.affectsConfiguration('fileLengthLint.respectGitignore') ||
+					     event.affectsConfiguration('fileLengthLint.realtimeScanningEnabled') ||
+					     event.affectsConfiguration('fileLengthLint.enabled'))) {
+						console.log('Re-scanning workspace due to configuration change');
+						scanWorkspaceFiles(true);
+					}
 				}
 			}
 		}),
@@ -313,10 +435,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// Handle file creation and deletion
 		vscode.workspace.onDidCreateFiles(event => {
-			if (getConfig().realtimeScanningEnabled) {
+			if (getConfig(true).realtimeScanningEnabled) {
 				// Scan only the newly created files
 				const newFiles = event.files.map(uri => uri.fsPath);
-				scanSpecificFiles(newFiles);
+				scanSpecificFiles(newFiles, true);
 			}
 		}),
 
@@ -400,53 +522,130 @@ function updateStatusBar() {
 	statusBarItem.show();
 }
 
+// Default configuration values
+const DEFAULT_CONFIG: FileLengthLintConfig = {
+	maxLines: 300,
+	languageSpecificMaxLines: {
+		javascript: 500,
+		typescript: 500,
+		markdown: 1000,
+		json: 5000,
+		html: 800
+	},
+	enabled: true,
+	exclude: [
+		'**/.git/**',
+		'**/node_modules/**',
+		'**/dist/**',
+		'**/out/**',
+		'**/bin/**',
+		'**/obj/**',
+		'**/.vs/**',
+		'**/.idea/**',
+		'**/*.min.js',
+		'**/*.min.css',
+		'**/*.dll',
+		'**/*.exe',
+		'**/*.png',
+		'**/*.jpg',
+		'**/*.jpeg',
+		'**/*.gif',
+		'**/*.ico',
+		'**/*.svg',
+		'**/*.woff',
+		'**/*.woff2',
+		'**/*.ttf',
+		'**/*.eot',
+		'**/*.pdf',
+		'**/*.zip',
+		'**/*.tar',
+		'**/*.gz',
+		'**/*.7z'
+	],
+	respectGitignore: true,
+	realtimeScanningEnabled: true,
+	customQuickFixMessage: ''
+};
+
+/**
+ * Validate and restore missing settings
+ * @param showNotification Whether to show a notification when settings are restored
+ */
+async function validateAndRestoreSettings(showNotification: boolean = true): Promise<boolean> {
+	const config = vscode.workspace.getConfiguration('fileLengthLint');
+	let settingsRestored = false;
+	let restoredSettings: string[] = [];
+
+	// Check for missing critical settings and restore them
+	if (config.get('maxLines') === undefined) {
+		await config.update('maxLines', DEFAULT_CONFIG.maxLines, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('maxLines');
+	}
+
+	if (config.get('enabled') === undefined) {
+		await config.update('enabled', DEFAULT_CONFIG.enabled, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('enabled');
+	}
+
+	if (config.get('exclude') === undefined) {
+		await config.update('exclude', DEFAULT_CONFIG.exclude, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('exclude');
+	}
+
+	if (config.get('respectGitignore') === undefined) {
+		await config.update('respectGitignore', DEFAULT_CONFIG.respectGitignore, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('respectGitignore');
+	}
+
+	if (config.get('realtimeScanningEnabled') === undefined) {
+		await config.update('realtimeScanningEnabled', DEFAULT_CONFIG.realtimeScanningEnabled, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('realtimeScanningEnabled');
+	}
+
+	if (config.get('languageSpecificMaxLines') === undefined) {
+		await config.update('languageSpecificMaxLines', DEFAULT_CONFIG.languageSpecificMaxLines, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('languageSpecificMaxLines');
+	}
+
+	// Show notification if settings were restored
+	if (settingsRestored && showNotification) {
+		const message = `File Length Lint: Restored missing settings (${restoredSettings.join(', ')})`;
+		const viewSettings = 'View Settings';
+
+		vscode.window.showInformationMessage(message, viewSettings).then(selection => {
+			if (selection === viewSettings) {
+				vscode.commands.executeCommand('workbench.action.openSettings', 'fileLengthLint');
+			}
+		});
+	}
+
+	return settingsRestored;
+}
+
 /**
  * Get the extension configuration
+ * @param forceRefresh Force a refresh of the configuration from VS Code
  */
-function getConfig(): FileLengthLintConfig {
+function getConfig(forceRefresh: boolean = false): FileLengthLintConfig {
+	// Always get a fresh configuration to ensure we have the latest settings
 	const config = vscode.workspace.getConfiguration('fileLengthLint');
+	console.log('Getting configuration' + (forceRefresh ? ' (forced refresh)' : ''));
+
+	// Create a config object with default values as fallbacks
 	return {
-		maxLines: config.get<number>('maxLines', 300),
-		languageSpecificMaxLines: config.get<Record<string, number>>('languageSpecificMaxLines', {
-			javascript: 500,
-			typescript: 500,
-			markdown: 1000,
-			json: 5000,
-			html: 800
-		}),
-		enabled: config.get<boolean>('enabled', true),
-		exclude: config.get<string[]>('exclude', [
-			'**/.git/**',
-			'**/node_modules/**',
-			'**/dist/**',
-			'**/out/**',
-			'**/bin/**',
-			'**/obj/**',
-			'**/.vs/**',
-			'**/.idea/**',
-			'**/*.min.js',
-			'**/*.min.css',
-			'**/*.dll',
-			'**/*.exe',
-			'**/*.png',
-			'**/*.jpg',
-			'**/*.jpeg',
-			'**/*.gif',
-			'**/*.ico',
-			'**/*.svg',
-			'**/*.woff',
-			'**/*.woff2',
-			'**/*.ttf',
-			'**/*.eot',
-			'**/*.pdf',
-			'**/*.zip',
-			'**/*.tar',
-			'**/*.gz',
-			'**/*.7z'
-		]),
-		respectGitignore: config.get<boolean>('respectGitignore', true),
-		realtimeScanningEnabled: config.get<boolean>('realtimeScanningEnabled', true),
-		customQuickFixMessage: config.get<string>('customQuickFixMessage', '')
+		maxLines: config.get<number>('maxLines', DEFAULT_CONFIG.maxLines),
+		languageSpecificMaxLines: config.get<Record<string, number>>('languageSpecificMaxLines', DEFAULT_CONFIG.languageSpecificMaxLines),
+		enabled: config.get<boolean>('enabled', DEFAULT_CONFIG.enabled),
+		exclude: config.get<string[]>('exclude', DEFAULT_CONFIG.exclude),
+		respectGitignore: config.get<boolean>('respectGitignore', DEFAULT_CONFIG.respectGitignore),
+		realtimeScanningEnabled: config.get<boolean>('realtimeScanningEnabled', DEFAULT_CONFIG.realtimeScanningEnabled),
+		customQuickFixMessage: config.get<string>('customQuickFixMessage', DEFAULT_CONFIG.customQuickFixMessage)
 	};
 }
 
@@ -480,26 +679,42 @@ function getGitignoreParser(workspaceFolderPath: string): ReturnType<typeof igno
 	// Create a new parser
 	const gitignorePath = path.join(workspaceFolderPath, '.gitignore');
 
-	// Check if the .gitignore file exists
-	if (!fs.existsSync(gitignorePath)) {
-		// No .gitignore file, return undefined
-		return undefined;
-	}
-
 	try {
+		// Check if the .gitignore file exists and is readable
+		if (!fs.existsSync(gitignorePath) || !fs.statSync(gitignorePath).isFile()) {
+			// No .gitignore file or not a regular file, return undefined
+			return undefined;
+		}
+
 		// Read the .gitignore file
 		const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
 
-		// Create a new parser
-		const parser = ignore().add(gitignoreContent);
+		// Create a new parser with default rules
+		const parser = ignore()
+			// Add some common default rules that are often in .gitignore files
+			.add('node_modules/')
+			.add('.git/')
+			.add('*.log')
+			// Add the content from the .gitignore file
+			.add(gitignoreContent);
 
 		// Cache the parser
 		gitignoreCache.set(workspaceFolderPath, parser);
 
+		console.log(`Created gitignore parser for ${workspaceFolderPath}`);
 		return parser;
 	} catch (error) {
-		console.error(`Error reading .gitignore file: ${error}`);
-		return undefined;
+		console.error(`Error reading .gitignore file at ${gitignorePath}: ${error}`);
+		// Create a default parser with common patterns
+		const defaultParser = ignore()
+			.add('node_modules/')
+			.add('.git/')
+			.add('*.log');
+
+		// Cache the default parser
+		gitignoreCache.set(workspaceFolderPath, defaultParser);
+
+		return defaultParser;
 	}
 }
 
@@ -509,27 +724,64 @@ function getGitignoreParser(workspaceFolderPath: string): ReturnType<typeof igno
 function shouldLintFile(filePath: string, config: FileLengthLintConfig): boolean {
 	const relativePath = vscode.workspace.asRelativePath(filePath);
 
+	// Log the current exclusion patterns for debugging
+	console.log(`Checking file ${relativePath} against ${config.exclude.length} exclusion patterns`);
+
 	// Check if file matches any exclude pattern
 	for (const pattern of config.exclude) {
-		if (minimatch(relativePath, pattern, { nocase: true })) {
-			return false;
+		try {
+			// Try both with and without the dot option to ensure consistent behavior
+			if (minimatch(relativePath, pattern, { nocase: true, dot: true }) ||
+			    minimatch(relativePath, pattern, { nocase: true })) {
+				console.log(`Excluded file ${relativePath} by pattern ${pattern}`);
+				return false;
+			}
+
+			// Also try matching just the filename for patterns like *.dll
+			const fileName = path.basename(relativePath);
+			if (pattern.startsWith('*.') && minimatch(fileName, pattern, { nocase: true })) {
+				console.log(`Excluded file ${relativePath} by filename pattern ${pattern}`);
+				return false;
+			}
+
+			// For directory patterns like **/bin/**, also check if the path contains the directory
+			if (pattern.includes('/**/') || pattern.startsWith('**/') || pattern.endsWith('/**')) {
+				// Convert pattern to a simpler form for checking directory inclusion
+				const dirPattern = pattern.replace(/\*\*/g, '');
+				if (dirPattern && relativePath.includes(dirPattern)) {
+					console.log(`Excluded file ${relativePath} by directory pattern ${pattern}`);
+					return false;
+				}
+			}
+		} catch (error) {
+			// Log error but continue checking other patterns
+			console.error(`Error checking pattern ${pattern} against ${relativePath}: ${error}`);
 		}
 	}
 
 	// Check if file should be ignored based on .gitignore
 	if (config.respectGitignore) {
-		const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
-		if (workspaceFolder) {
-			const gitignoreParser = getGitignoreParser(workspaceFolder.uri.fsPath);
-			if (gitignoreParser) {
-				// Get the path relative to the workspace folder
-				const workspaceRelativePath = path.relative(workspaceFolder.uri.fsPath, filePath);
+		try {
+			const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+			if (workspaceFolder) {
+				const gitignoreParser = getGitignoreParser(workspaceFolder.uri.fsPath);
+				if (gitignoreParser) {
+					// Get the path relative to the workspace folder
+					const workspaceRelativePath = path.relative(workspaceFolder.uri.fsPath, filePath);
 
-				// Check if the file is ignored by .gitignore
-				if (gitignoreParser.ignores(workspaceRelativePath.replace(/\\/g, '/'))) {
-					return false;
+					// Normalize path separators for cross-platform compatibility
+					const normalizedPath = workspaceRelativePath.replace(/\\/g, '/');
+
+					// Check if the file is ignored by .gitignore
+					if (gitignoreParser.ignores(normalizedPath)) {
+						console.log(`File ${relativePath} ignored by .gitignore rules`);
+						return false;
+					}
 				}
 			}
+		} catch (error) {
+			// Log error but continue with other checks
+			console.error(`Error checking .gitignore rules for ${relativePath}: ${error}`);
 		}
 	}
 
@@ -555,10 +807,11 @@ function terminateWorkers() {
 
 /**
  * Lint all open files in the workspace
+ * @param forceRefresh Force a refresh of the configuration
  */
-async function lintOpenFiles() {
+async function lintOpenFiles(forceRefresh: boolean = false) {
 	// Get the configuration
-	const config = getConfig();
+	const config = getConfig(forceRefresh);
 
 	// If linting is disabled, return early
 	if (!config.enabled) {
@@ -578,10 +831,11 @@ async function lintOpenFiles() {
 
 /**
  * Scan workspace files using worker threads
+ * @param forceRefresh Force a refresh of the configuration
  */
-async function scanWorkspaceFiles() {
+async function scanWorkspaceFiles(forceRefresh: boolean = false) {
 	// Get the configuration
-	const config = getConfig();
+	const config = getConfig(forceRefresh);
 
 	// If linting is disabled or already scanning, return early
 	if (!config.enabled || !config.realtimeScanningEnabled || isScanning) {
@@ -600,23 +854,25 @@ async function scanWorkspaceFiles() {
 
 	try {
 		// Find all files in the workspace
+		// Note: VS Code's findFiles uses a different glob syntax than minimatch
+		// We'll get all files and filter them ourselves to ensure consistent behavior
 		const fileUris = await vscode.workspace.findFiles(
 			'**/*',
-			'{' + config.exclude.join(',') + '}'
+			'**/node_modules/**' // Only exclude node_modules to improve performance
 		);
 
 		// Filter files
 		const filesToScan: string[] = [];
 
 		for (const uri of fileUris) {
-			// Skip files that are already open in the editor
-			if (openFiles.has(uri.fsPath)) {
-				continue;
-			}
-
+			// Don't skip open files - we want to scan all files in the workspace
 			// Check if the file should be linted
 			if (shouldLintFile(uri.fsPath, config)) {
 				filesToScan.push(uri.fsPath);
+			} else {
+				// File was excluded by pattern or gitignore
+				const relativePath = vscode.workspace.asRelativePath(uri.fsPath);
+				console.log(`Skipping file ${relativePath} due to exclusion rules`);
 			}
 		}
 
@@ -672,7 +928,10 @@ async function scanWorkspaceFiles() {
 					worker.on('exit', (code) => {
 						if (code !== 0) {
 							console.error(`Worker stopped with exit code ${code}`);
-							reject(new Error(`Worker stopped with exit code ${code}`));
+							// Don't reject the promise on non-zero exit code
+							// This allows the extension to continue processing other files
+							// Just resolve with an empty array for this worker
+							resolve([]);
 						}
 					});
 				} catch (error) {
@@ -738,10 +997,11 @@ async function scanWorkspaceFiles() {
 /**
  * Scan specific files using worker threads
  * @param filePaths Array of file paths to scan
+ * @param forceRefresh Force a refresh of the configuration
  */
-async function scanSpecificFiles(filePaths: string[]) {
+async function scanSpecificFiles(filePaths: string[], forceRefresh: boolean = false) {
 	// Get the configuration
-	const config = getConfig();
+	const config = getConfig(forceRefresh);
 
 	// If linting is disabled or already scanning, return early
 	if (!config.enabled || !config.realtimeScanningEnabled || isScanning || filePaths.length === 0) {
@@ -756,14 +1016,12 @@ async function scanSpecificFiles(filePaths: string[]) {
 		const filesToScan: string[] = [];
 
 		for (const filePath of filePaths) {
-			// Skip files that are already open in the editor
-			if (openFiles.has(filePath)) {
-				continue;
-			}
-
+			// Don't skip open files - we want to scan all files in the workspace
 			// Check if the file should be linted
 			if (shouldLintFile(filePath, config)) {
 				filesToScan.push(filePath);
+			} else {
+				console.log(`Skipping file ${filePath} due to exclusion rules`);
 			}
 		}
 
@@ -853,6 +1111,8 @@ async function scanSpecificFiles(filePaths: string[]) {
 		worker.on('exit', (code) => {
 			if (code !== 0) {
 				console.error(`Worker stopped with exit code ${code}`);
+				// Even if the worker exits with an error, we'll continue
+				// This prevents the extension from getting stuck
 			}
 
 			// Remove from worker threads array
