@@ -1,0 +1,74 @@
+{
+  "name": "file-length-lint",
+  "displayName": "File Length Lint",
+  "description": "A lightweight extension to lint files based on their length",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "File Length Lint",
+      "properties": {
+        "fileLengthLint.maxLines": {
+          "type": "number",
+          "default": 300,
+          "minimum": 1,
+          "description": "Maximum number of lines allowed in a file before showing a lint error"
+        },
+        "fileLengthLint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable file length linting"
+        },
+        "fileLengthLint.exclude": {
+          "type": "array",
+          "default": [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/out/**"
+          ],
+          "description": "Glob patterns to exclude from file length linting"
+        },
+        "fileLengthLint.include": {
+          "type": "array",
+          "default": [
+            "**/*"
+          ],
+          "description": "Glob patterns to include in file length linting"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "minimatch": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.98.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/minimatch": "^5.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "eslint": "^9.21.0",
+    "typescript": "^5.7.3",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}
