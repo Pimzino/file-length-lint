@@ -2,7 +2,7 @@
   "name": "file-length-lint",
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "Pimzino",
   "icon": "images/icon.png",
   "repository": {
