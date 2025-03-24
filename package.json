@@ -44,6 +44,28 @@
             "**/*"
           ],
           "description": "Glob patterns to include in file length linting"
+        },
+        "fileLengthLint.respectGitignore": {
+          "type": "boolean",
+          "default": true,
+          "description": "Respect .gitignore files when scanning for files to lint"
+        },
+        "fileLengthLint.backgroundScanEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable background scanning of files in the workspace"
+        },
+        "fileLengthLint.backgroundScanIntervalMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "Interval in minutes between background scans of the workspace"
+        },
+        "fileLengthLint.maxFilesPerScan": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "description": "Maximum number of files to scan in a single background scan batch to limit resource usage"
         }
       }
     }
@@ -57,7 +79,8 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "minimatch": "^9.0.3"
+    "minimatch": "^9.0.3",
+    "ignore": "^5.3.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.98.0",

@@ -51,6 +51,8 @@ suite('File Length Lint Extension Tests', () => {
         await vscode.workspace.getConfiguration('fileLengthLint').update('enabled', true, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration('fileLengthLint').update('include', ['**/*'], vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration('fileLengthLint').update('exclude', [], vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration('fileLengthLint').update('respectGitignore', true, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration('fileLengthLint').update('backgroundScanEnabled', false, vscode.ConfigurationTarget.Global);
     });
     teardown(async () => {
         // Clean up temporary files and reset configuration
@@ -62,6 +64,8 @@ suite('File Length Lint Extension Tests', () => {
         await vscode.workspace.getConfiguration('fileLengthLint').update('enabled', undefined, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration('fileLengthLint').update('include', undefined, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration('fileLengthLint').update('exclude', undefined, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration('fileLengthLint').update('respectGitignore', undefined, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration('fileLengthLint').update('backgroundScanEnabled', undefined, vscode.ConfigurationTarget.Global);
     });
     test('Should report diagnostic when file exceeds max lines', async () => {
         // Create a file with more than the max lines
@@ -111,6 +115,31 @@ suite('File Length Lint Extension Tests', () => {
         const diagnostics = vscode.languages.getDiagnostics(document.uri);
         // Verify that no diagnostic was reported when disabled
         assert.strictEqual(diagnostics.length, 0, 'Should have no diagnostics when disabled');
+    });
+    test('Should respect .gitignore files', async () => {
+        // Create a .gitignore file that ignores the test file
+        const gitignorePath = path.join(tempDir, '.gitignore');
+        fs.writeFileSync(gitignorePath, 'test-file.txt');
+        // Create a file with more than the max lines
+        const content = Array(10).fill('Test line').join('\n');
+        fs.writeFileSync(tempFilePath, content);
+        // Open the file in VS Code
+        const document = await vscode.workspace.openTextDocument(tempFilePath);
+        await vscode.window.showTextDocument(document);
+        // Wait for diagnostics to be calculated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Get diagnostics for the file
+        let diagnostics = vscode.languages.getDiagnostics(document.uri);
+        // Verify that no diagnostic was reported because the file is in .gitignore
+        assert.strictEqual(diagnostics.length, 0, 'Should have no diagnostics for files in .gitignore');
+        // Disable .gitignore support
+        await vscode.workspace.getConfiguration('fileLengthLint').update('respectGitignore', false, vscode.ConfigurationTarget.Global);
+        // Wait for diagnostics to be recalculated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Get diagnostics for the file again
+        diagnostics = vscode.languages.getDiagnostics(document.uri);
+        // Verify that a diagnostic was reported when .gitignore support is disabled
+        assert.strictEqual(diagnostics.length, 1, 'Should have diagnostics when .gitignore support is disabled');
     });
 });
 //# sourceMappingURL=extension.test.js.map
