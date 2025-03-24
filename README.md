@@ -1,7 +1,25 @@
 # File Length Lint
 
 <p align="center">
-  <img src="images/logo.svg" width="128" height="128" alt="File Length Lint Logo">
+  <img src="https://raw.githubusercontent.com/Pimzino/file-length-lint/main/images/logo.png" width="128" height="128" alt="File Length Lint Logo">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Pimzino/file-length-lint/stargazers">
+    <img src="https://img.shields.io/github/stars/Pimzino/file-length-lint.svg?style=social" alt="GitHub stars">
+  </a>
+  <a href="https://github.com/Pimzino/file-length-lint/issues">
+    <img src="https://img.shields.io/github/issues/Pimzino/file-length-lint.svg" alt="GitHub issues">
+  </a>
+  <a href="https://github.com/Pimzino/file-length-lint/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Pimzino/file-length-lint.svg" alt="License">
+  </a>
+  <a href="https://github.com/Pimzino/file-length-lint/releases">
+    <img src="https://img.shields.io/github/v/release/Pimzino/file-length-lint.svg" alt="GitHub release">
+  </a>
+  <a href="https://www.buymeacoffee.com/pimzino">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="30">
+  </a>
 </p>
 
 A lightweight VS Code extension that checks the number of lines in your files and reports problems when files exceed a configured maximum line count.
