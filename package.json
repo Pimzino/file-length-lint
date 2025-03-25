@@ -2,7 +2,7 @@
   "name": "file-length-lint",
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "Pimzino",
   "icon": "images/icon.png",
   "repository": {
@@ -76,6 +76,7 @@
             "**/obj/**",
             "**/.vs/**",
             "**/.idea/**",
+            "**/.vscode/settings.json",
             "**/*.min.js",
             "**/*.min.css",
             "**/*.dll",
@@ -113,6 +114,14 @@
           "type": "string",
           "default": "",
           "description": "Custom message to append to the quick fix suggestion. For example: 'Please consider refactoring this file according to our team guidelines.'"
+        },
+        "fileLengthLint.disabledLanguages": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "List of language IDs for which linting should be disabled. For example: ['markdown', 'json', 'yaml']"
         }
       }
     }

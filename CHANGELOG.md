@@ -2,6 +2,13 @@
 
 All notable changes to the "file-length-lint" extension will be documented in this file.
 
+## [0.0.4] - 2025-03-25
+
+- Fix bug where worker threads would crash with non-serialized objects
+- Add ability to disable linting for specific languages
+- Added .vscode/settings.json to default excludes (remove it manually if you want to lint this file)
+
+
 ## [0.0.3] - 2025-03-24
 
 - Initial release of File Length Lint

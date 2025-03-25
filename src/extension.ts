@@ -77,6 +77,7 @@ interface FileLengthLintConfig {
 	respectGitignore: boolean;
 	realtimeScanningEnabled: boolean;
 	customQuickFixMessage: string;
+	disabledLanguages: string[];
 }
 
 /**
@@ -251,6 +252,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			await config.update('respectGitignore', DEFAULT_CONFIG.respectGitignore, vscode.ConfigurationTarget.Global);
 			await config.update('realtimeScanningEnabled', DEFAULT_CONFIG.realtimeScanningEnabled, vscode.ConfigurationTarget.Global);
 			await config.update('customQuickFixMessage', DEFAULT_CONFIG.customQuickFixMessage, vscode.ConfigurationTarget.Global);
+			await config.update('disabledLanguages', DEFAULT_CONFIG.disabledLanguages, vscode.ConfigurationTarget.Global);
 
 			// Show a notification that settings were reset
 			const viewSettings = 'View Settings';
@@ -542,6 +544,7 @@ const DEFAULT_CONFIG: FileLengthLintConfig = {
 		'**/obj/**',
 		'**/.vs/**',
 		'**/.idea/**',
+		'**/.vscode/settings.json',
 		'**/*.min.js',
 		'**/*.min.css',
 		'**/*.dll',
@@ -564,7 +567,8 @@ const DEFAULT_CONFIG: FileLengthLintConfig = {
 	],
 	respectGitignore: true,
 	realtimeScanningEnabled: true,
-	customQuickFixMessage: ''
+	customQuickFixMessage: '',
+	disabledLanguages: []
 };
 
 /**
@@ -613,6 +617,12 @@ async function validateAndRestoreSettings(showNotification: boolean = true): Pro
 		restoredSettings.push('languageSpecificMaxLines');
 	}
 
+	if (config.get('disabledLanguages') === undefined) {
+		await config.update('disabledLanguages', DEFAULT_CONFIG.disabledLanguages, vscode.ConfigurationTarget.Global);
+		settingsRestored = true;
+		restoredSettings.push('disabledLanguages');
+	}
+
 	// Show notification if settings were restored
 	if (settingsRestored && showNotification) {
 		const message = `File Length Lint: Restored missing settings (${restoredSettings.join(', ')})`;
@@ -645,7 +655,8 @@ function getConfig(forceRefresh: boolean = false): FileLengthLintConfig {
 		exclude: config.get<string[]>('exclude', DEFAULT_CONFIG.exclude),
 		respectGitignore: config.get<boolean>('respectGitignore', DEFAULT_CONFIG.respectGitignore),
 		realtimeScanningEnabled: config.get<boolean>('realtimeScanningEnabled', DEFAULT_CONFIG.realtimeScanningEnabled),
-		customQuickFixMessage: config.get<string>('customQuickFixMessage', DEFAULT_CONFIG.customQuickFixMessage)
+		customQuickFixMessage: config.get<string>('customQuickFixMessage', DEFAULT_CONFIG.customQuickFixMessage),
+		disabledLanguages: config.get<string[]>('disabledLanguages', DEFAULT_CONFIG.disabledLanguages)
 	};
 }
 
@@ -719,13 +730,68 @@ function getGitignoreParser(workspaceFolderPath: string): ReturnType<typeof igno
 }
 
 /**
- * Check if a file should be linted based on exclude patterns and .gitignore
+ * Check if a file should be linted based on exclude patterns, .gitignore, and disabled languages
  */
 function shouldLintFile(filePath: string, config: FileLengthLintConfig): boolean {
 	const relativePath = vscode.workspace.asRelativePath(filePath);
 
 	// Log the current exclusion patterns for debugging
 	console.log(`Checking file ${relativePath} against ${config.exclude.length} exclusion patterns`);
+
+	// Check if the file's language is in the disabled languages list
+	const uri = vscode.Uri.file(filePath);
+	const textDocuments = vscode.workspace.textDocuments;
+	const document = textDocuments.find(doc => doc.uri.fsPath === filePath);
+
+	if (document) {
+		// If the document is open, we can directly check its language ID
+		const languageId = document.languageId.toLowerCase();
+		if (config.disabledLanguages.includes(languageId)) {
+			console.log(`Skipping file ${relativePath} because language ${languageId} is disabled`);
+			return false;
+		}
+	} else {
+		// If the document is not open, try to determine language from file extension
+		const extension = path.extname(filePath).toLowerCase();
+		if (extension) {
+			// Remove the dot from the extension
+			const extensionWithoutDot = extension.substring(1);
+
+			// Common language mappings
+			const extensionToLanguageMap: Record<string, string> = {
+				'js': 'javascript',
+				'jsx': 'javascriptreact',
+				'ts': 'typescript',
+				'tsx': 'typescriptreact',
+				'html': 'html',
+				'css': 'css',
+				'json': 'json',
+				'md': 'markdown',
+				'py': 'python',
+				'java': 'java',
+				'c': 'c',
+				'cpp': 'cpp',
+				'cs': 'csharp',
+				'go': 'go',
+				'rs': 'rust',
+				'php': 'php',
+				'rb': 'ruby',
+				'swift': 'swift',
+				'yaml': 'yaml',
+				'yml': 'yaml',
+				'xml': 'xml',
+				'sh': 'shellscript',
+				'bat': 'bat',
+				'ps1': 'powershell'
+			};
+
+			const languageId = extensionToLanguageMap[extensionWithoutDot];
+			if (languageId && config.disabledLanguages.includes(languageId)) {
+				console.log(`Skipping file ${relativePath} because language ${languageId} is disabled`);
+				return false;
+			}
+		}
+	}
 
 	// Check if file matches any exclude pattern
 	for (const pattern of config.exclude) {
@@ -902,12 +968,17 @@ async function scanWorkspaceFiles(forceRefresh: boolean = false) {
 		const workerPromises = fileGroups.map(group => {
 			return new Promise<any[]>((resolve, reject) => {
 				try {
-					// Create a worker thread
+					// Create a worker thread with serializable data
+					// Use JSON.stringify/parse to ensure data is serializable
+					const serializableData = JSON.parse(JSON.stringify({
+						filePaths: group,
+						maxLines: config.maxLines,
+						languageSpecificMaxLines: config.languageSpecificMaxLines,
+						disabledLanguages: config.disabledLanguages
+					}));
+
 					const worker = new Worker(path.join(__dirname, 'worker.js'), {
-						workerData: {
-							filePaths: group,
-							maxLines: config.maxLines
-						}
+						workerData: serializableData
 					});
 
 					// Add to worker threads array
@@ -935,7 +1006,15 @@ async function scanWorkspaceFiles(forceRefresh: boolean = false) {
 						}
 					});
 				} catch (error) {
-					console.error(`Error creating worker: ${error}`);
+					// Provide more detailed error information
+					if (error instanceof Error) {
+						console.error(`Error creating worker: ${error.name}: ${error.message}`);
+						if (error.name === 'DataCloneError') {
+							console.error('DataCloneError indicates non-serializable data was passed to the worker.');
+						}
+					} else {
+						console.error(`Error creating worker: ${error}`);
+					}
 					reject(error);
 				}
 			});
@@ -1031,13 +1110,34 @@ async function scanSpecificFiles(filePaths: string[], forceRefresh: boolean = fa
 			return;
 		}
 
-		// Create a worker thread
-		const worker = new Worker(path.join(__dirname, 'worker.js'), {
-			workerData: {
+		// Create a worker thread with serializable data
+		let worker: Worker;
+		try {
+			// Use JSON.stringify/parse to ensure data is serializable
+			const serializableData = JSON.parse(JSON.stringify({
 				filePaths: filesToScan,
-				maxLines: config.maxLines
+				maxLines: config.maxLines,
+				languageSpecificMaxLines: config.languageSpecificMaxLines,
+				disabledLanguages: config.disabledLanguages
+			}));
+
+			worker = new Worker(path.join(__dirname, 'worker.js'), {
+				workerData: serializableData
+			});
+		} catch (error) {
+			// Provide more detailed error information
+			if (error instanceof Error) {
+				console.error(`Error creating worker: ${error.name}: ${error.message}`);
+				if (error.name === 'DataCloneError') {
+					console.error('DataCloneError indicates non-serializable data was passed to the worker.');
+				}
+			} else {
+				console.error(`Error creating worker: ${error}`);
 			}
-		});
+			// Reset scanning flag and return early
+			isScanning = false;
+			return;
+		}
 
 		// Add to worker threads array
 		workerThreads.push(worker);
@@ -1092,7 +1192,15 @@ async function scanSpecificFiles(filePaths: string[], forceRefresh: boolean = fa
 
 		// Handle worker errors
 		worker.on('error', (error) => {
-			console.error(`Worker error: ${error}`);
+			// Provide more detailed error information
+			if (error instanceof Error) {
+				console.error(`Worker error: ${error.name}: ${error.message}`);
+				if (error.name === 'DataCloneError') {
+					console.error('DataCloneError indicates non-serializable data was passed to the worker.');
+				}
+			} else {
+				console.error(`Worker error: ${error}`);
+			}
 
 			// Terminate the worker
 			worker.terminate();

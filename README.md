@@ -28,6 +28,7 @@ A lightweight VS Code extension that checks the number of lines in your files an
 
 - Configurable maximum line count for files
 - Language-specific line count limits (different limits for different file types)
+- Ability to disable linting for specific languages
 - Reports problems in the VS Code Problems panel
 - Status bar indicator showing current file's line count
 - On-demand workspace scanning command
@@ -64,6 +65,7 @@ This extension contributes the following settings:
 
 * `fileLengthLint.maxLines`: Maximum number of lines allowed in a file before showing a lint error (default: 300)
 * `fileLengthLint.languageSpecificMaxLines`: Language-specific maximum line counts that override the global setting (default: { "javascript": 500, "typescript": 500, "markdown": 1000, "json": 5000, "html": 800 })
+* `fileLengthLint.disabledLanguages`: List of language IDs for which linting should be disabled (default: []). For example: ["markdown", "json", "yaml"]
 * `fileLengthLint.enabled`: Enable or disable file length linting (default: true)
 * `fileLengthLint.exclude`: Glob patterns to exclude from file length linting. Supports patterns like `**/*.dll` (all .dll files in any directory) or `*.dll` (any .dll file). By default, excludes common binary files, build outputs, and version control directories.
 * `fileLengthLint.respectGitignore`: Respect .gitignore files when scanning for files to lint (default: true)
