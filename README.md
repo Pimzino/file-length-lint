@@ -38,6 +38,7 @@ A lightweight VS Code extension that checks the number of lines in your files an
 - Respects .gitignore files (can be disabled) with real-time updates when files change
 - Immediately applies changes to exclusion settings and .gitignore files without requiring a reload
 - Minimal performance impact with optimized file processing
+- Token-based linting for estimating the number of tokens that would be used by an LLM (Large Language Model)
 
 ## How It Works
 
