@@ -86,6 +86,23 @@ function getMaxLinesForFile(filePath, defaultMaxLines, languageSpecificMaxLines)
     }
     return defaultMaxLines;
 }
+// Helper function to get max tokens for a file based on its language
+function getMaxTokensForFile(filePath, defaultMaxTokens, languageSpecificMaxTokens) {
+    if (!languageSpecificMaxTokens) {
+        return defaultMaxTokens;
+    }
+    const extension = getFileExtension(filePath);
+    const languageId = getLanguageIdFromExtension(extension);
+    if (languageId && languageSpecificMaxTokens[languageId] !== undefined) {
+        return languageSpecificMaxTokens[languageId];
+    }
+    return defaultMaxTokens;
+}
+// Helper function to count tokens in a text string
+function countTokens(text) {
+    // Simple token counting approximation: 1 token ≈ 4 characters
+    return Math.ceil(text.length / 4);
+}
 // Process the files assigned to this worker
 if (worker_threads_1.parentPort) {
     // Ensure worker data is properly serialized
@@ -101,7 +118,7 @@ if (worker_threads_1.parentPort) {
             maxLines: 300
         };
     }
-    const { filePaths, maxLines, languageSpecificMaxLines, disabledLanguages } = safeWorkerData;
+    const { filePaths, maxLines, languageSpecificMaxLines, measurementType = 'lines', maxTokens = 2000, languageSpecificMaxTokens, disabledLanguages } = safeWorkerData;
     const results = [];
     for (const filePath of filePaths) {
         try {
@@ -119,17 +136,37 @@ if (worker_threads_1.parentPort) {
                     }
                     // Read the file content
                     const content = fs.readFileSync(filePath, 'utf8');
-                    // Count the number of lines
-                    const lineCount = content.split('\n').length;
-                    // Get the max lines for this file based on its language
-                    const fileMaxLines = getMaxLinesForFile(filePath, maxLines, languageSpecificMaxLines);
-                    // Check if the line count exceeds the maximum
-                    if (lineCount > fileMaxLines) {
-                        results.push({
-                            filePath,
-                            lineCount,
-                            exceeds: true
-                        });
+                    // Check which measurement type to use
+                    if (measurementType === 'tokens') {
+                        // Count the number of tokens
+                        const tokenCount = countTokens(content);
+                        // Get the max tokens for this file based on its language
+                        const fileMaxTokens = getMaxTokensForFile(filePath, maxTokens, languageSpecificMaxTokens);
+                        // Check if the token count exceeds the maximum
+                        if (tokenCount > fileMaxTokens) {
+                            results.push({
+                                filePath,
+                                lineCount: content.split('\n').length, // Include line count for reference
+                                tokenCount,
+                                exceeds: true,
+                                measurementType: 'tokens'
+                            });
+                        }
+                    }
+                    else {
+                        // Count the number of lines
+                        const lineCount = content.split('\n').length;
+                        // Get the max lines for this file based on its language
+                        const fileMaxLines = getMaxLinesForFile(filePath, maxLines, languageSpecificMaxLines);
+                        // Check if the line count exceeds the maximum
+                        if (lineCount > fileMaxLines) {
+                            results.push({
+                                filePath,
+                                lineCount,
+                                exceeds: true,
+                                measurementType: 'lines'
+                            });
+                        }
                     }
                 }
                 catch (readError) {

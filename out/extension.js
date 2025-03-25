@@ -220,6 +220,9 @@ async function activate(context) {
             // Reset all settings to defaults
             await config.update('maxLines', DEFAULT_CONFIG.maxLines, vscode.ConfigurationTarget.Global);
             await config.update('languageSpecificMaxLines', DEFAULT_CONFIG.languageSpecificMaxLines, vscode.ConfigurationTarget.Global);
+            await config.update('measurementType', DEFAULT_CONFIG.measurementType, vscode.ConfigurationTarget.Global);
+            await config.update('maxTokens', DEFAULT_CONFIG.maxTokens, vscode.ConfigurationTarget.Global);
+            await config.update('languageSpecificMaxTokens', DEFAULT_CONFIG.languageSpecificMaxTokens, vscode.ConfigurationTarget.Global);
             await config.update('enabled', DEFAULT_CONFIG.enabled, vscode.ConfigurationTarget.Global);
             await config.update('exclude', DEFAULT_CONFIG.exclude, vscode.ConfigurationTarget.Global);
             await config.update('respectGitignore', DEFAULT_CONFIG.respectGitignore, vscode.ConfigurationTarget.Global);
@@ -248,7 +251,13 @@ async function activate(context) {
         // Get the configuration
         const config = getConfig();
         // Create the message with the custom message appended if available
-        let message = 'This file exceeds the maximum line count. Consider splitting it into multiple files:';
+        let message;
+        if (config.measurementType === 'tokens') {
+            message = 'This file exceeds the maximum token count. Consider splitting it into multiple files:';
+        }
+        else {
+            message = 'This file exceeds the maximum line count. Consider splitting it into multiple files:';
+        }
         console.log('Custom message from config:', config.customQuickFixMessage);
         if (config.customQuickFixMessage && config.customQuickFixMessage.trim() !== '') {
             message += ' ' + config.customQuickFixMessage;
@@ -412,7 +421,7 @@ function deactivate() {
     gitignoreCache.clear();
 }
 /**
- * Update the status bar with the current file's line count
+ * Update the status bar with the current file's line or token count
  */
 function updateStatusBar() {
     const editor = vscode.window.activeTextEditor;
@@ -422,27 +431,48 @@ function updateStatusBar() {
         statusBarItem.hide();
         return;
     }
-    // Get the line count of the current file
-    const lineCount = editor.document.lineCount;
-    // Get the maximum line count for this document type
-    const maxLines = getMaxLinesForDocument(editor.document, config);
     // Check if the file should be linted
     if (!shouldLintFile(editor.document.uri.fsPath, config)) {
-        statusBarItem.text = `$(list-unordered) ${lineCount} lines`;
+        statusBarItem.text = `$(list-unordered) ${editor.document.lineCount} lines`;
         statusBarItem.tooltip = 'This file is excluded from line length linting';
         statusBarItem.show();
         return;
     }
-    // Update the status bar text
-    if (lineCount > maxLines) {
-        statusBarItem.text = `$(error) ${lineCount}/${maxLines} lines`;
-        statusBarItem.tooltip = `This file exceeds the maximum line count of ${maxLines}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
-        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    // Check which measurement type to use
+    if (config.measurementType === 'tokens') {
+        // Get the token count of the current file
+        const text = editor.document.getText();
+        const tokenCount = countTokens(text);
+        // Get the maximum token count for this document type
+        const maxTokens = getMaxTokensForDocument(editor.document, config);
+        // Update the status bar text
+        if (tokenCount > maxTokens) {
+            statusBarItem.text = `$(error) ${tokenCount}/${maxTokens} tokens`;
+            statusBarItem.tooltip = `This file exceeds the maximum token count of ${maxTokens}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
+            statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+        }
+        else {
+            statusBarItem.text = `$(pass) ${tokenCount}/${maxTokens} tokens`;
+            statusBarItem.tooltip = `This file is within the maximum token count of ${maxTokens}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
+            statusBarItem.backgroundColor = undefined;
+        }
     }
     else {
-        statusBarItem.text = `$(pass) ${lineCount}/${maxLines} lines`;
-        statusBarItem.tooltip = `This file is within the maximum line count of ${maxLines}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
-        statusBarItem.backgroundColor = undefined;
+        // Get the line count of the current file
+        const lineCount = editor.document.lineCount;
+        // Get the maximum line count for this document type
+        const maxLines = getMaxLinesForDocument(editor.document, config);
+        // Update the status bar text
+        if (lineCount > maxLines) {
+            statusBarItem.text = `$(error) ${lineCount}/${maxLines} lines`;
+            statusBarItem.tooltip = `This file exceeds the maximum line count of ${maxLines}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
+            statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+        }
+        else {
+            statusBarItem.text = `$(pass) ${lineCount}/${maxLines} lines`;
+            statusBarItem.tooltip = `This file is within the maximum line count of ${maxLines}${editor.document.languageId ? ` for ${editor.document.languageId} files` : ''}`;
+            statusBarItem.backgroundColor = undefined;
+        }
     }
     statusBarItem.show();
 }
@@ -455,6 +485,15 @@ const DEFAULT_CONFIG = {
         markdown: 1000,
         json: 5000,
         html: 800
+    },
+    measurementType: 'lines',
+    maxTokens: 2000,
+    languageSpecificMaxTokens: {
+        javascript: 2000,
+        typescript: 2000,
+        markdown: 4000,
+        json: 8000,
+        html: 3000
     },
     enabled: true,
     exclude: [
@@ -536,6 +575,21 @@ async function validateAndRestoreSettings(showNotification = true) {
         settingsRestored = true;
         restoredSettings.push('disabledLanguages');
     }
+    if (config.get('measurementType') === undefined) {
+        await config.update('measurementType', DEFAULT_CONFIG.measurementType, vscode.ConfigurationTarget.Global);
+        settingsRestored = true;
+        restoredSettings.push('measurementType');
+    }
+    if (config.get('maxTokens') === undefined) {
+        await config.update('maxTokens', DEFAULT_CONFIG.maxTokens, vscode.ConfigurationTarget.Global);
+        settingsRestored = true;
+        restoredSettings.push('maxTokens');
+    }
+    if (config.get('languageSpecificMaxTokens') === undefined) {
+        await config.update('languageSpecificMaxTokens', DEFAULT_CONFIG.languageSpecificMaxTokens, vscode.ConfigurationTarget.Global);
+        settingsRestored = true;
+        restoredSettings.push('languageSpecificMaxTokens');
+    }
     // Show notification if settings were restored
     if (settingsRestored && showNotification) {
         const message = `File Length Lint: Restored missing settings (${restoredSettings.join(', ')})`;
@@ -560,6 +614,9 @@ function getConfig(forceRefresh = false) {
     return {
         maxLines: config.get('maxLines', DEFAULT_CONFIG.maxLines),
         languageSpecificMaxLines: config.get('languageSpecificMaxLines', DEFAULT_CONFIG.languageSpecificMaxLines),
+        measurementType: config.get('measurementType', DEFAULT_CONFIG.measurementType),
+        maxTokens: config.get('maxTokens', DEFAULT_CONFIG.maxTokens),
+        languageSpecificMaxTokens: config.get('languageSpecificMaxTokens', DEFAULT_CONFIG.languageSpecificMaxTokens),
         enabled: config.get('enabled', DEFAULT_CONFIG.enabled),
         exclude: config.get('exclude', DEFAULT_CONFIG.exclude),
         respectGitignore: config.get('respectGitignore', DEFAULT_CONFIG.respectGitignore),
@@ -582,6 +639,29 @@ function getMaxLinesForDocument(document, config) {
     }
     // Fall back to the global setting
     return config.maxLines;
+}
+/**
+ * Get the maximum token count for a specific document
+ * @param document The document to get the maximum token count for
+ * @param config The extension configuration
+ */
+function getMaxTokensForDocument(document, config) {
+    // Get the language ID of the document
+    const languageId = document.languageId.toLowerCase();
+    // Check if there's a language-specific setting for this language
+    if (config.languageSpecificMaxTokens && config.languageSpecificMaxTokens[languageId] !== undefined) {
+        return config.languageSpecificMaxTokens[languageId];
+    }
+    // Fall back to the global setting
+    return config.maxTokens;
+}
+/**
+ * Count the number of tokens in a text string
+ * @param text The text to count tokens for
+ */
+function countTokens(text) {
+    // Simple token counting approximation: 1 token ≈ 4 characters
+    return Math.ceil(text.length / 4);
 }
 /**
  * Get or create a gitignore parser for a workspace folder
@@ -841,6 +921,9 @@ async function scanWorkspaceFiles(forceRefresh = false) {
                         filePaths: group,
                         maxLines: config.maxLines,
                         languageSpecificMaxLines: config.languageSpecificMaxLines,
+                        measurementType: config.measurementType,
+                        maxTokens: config.maxTokens,
+                        languageSpecificMaxTokens: config.languageSpecificMaxTokens,
                         disabledLanguages: config.disabledLanguages
                     }));
                     const worker = new worker_threads_1.Worker(path.join(__dirname, 'worker.js'), {
@@ -898,7 +981,13 @@ async function scanWorkspaceFiles(forceRefresh = false) {
                         // Create a diagnostic for the first line of the file
                         const range = new vscode.Range(0, 0, 0, 0);
                         // Build the diagnostic message, including custom message if available
-                        let diagnosticMessage = `File has ${fileResult.lineCount} lines, which exceeds the maximum of ${config.maxLines} lines.`;
+                        let diagnosticMessage;
+                        if (fileResult.measurementType === 'tokens') {
+                            diagnosticMessage = `File has ${fileResult.tokenCount} tokens, which exceeds the maximum of ${config.maxTokens} tokens.`;
+                        }
+                        else {
+                            diagnosticMessage = `File has ${fileResult.lineCount} lines, which exceeds the maximum of ${config.maxLines} lines.`;
+                        }
                         if (config.customQuickFixMessage && config.customQuickFixMessage.trim() !== '') {
                             diagnosticMessage += ` ${config.customQuickFixMessage}`;
                         }
@@ -964,6 +1053,9 @@ async function scanSpecificFiles(filePaths, forceRefresh = false) {
                 filePaths: filesToScan,
                 maxLines: config.maxLines,
                 languageSpecificMaxLines: config.languageSpecificMaxLines,
+                measurementType: config.measurementType,
+                maxTokens: config.maxTokens,
+                languageSpecificMaxTokens: config.languageSpecificMaxTokens,
                 disabledLanguages: config.disabledLanguages
             }));
             worker = new worker_threads_1.Worker(path.join(__dirname, 'worker.js'), {
@@ -1082,31 +1174,63 @@ async function lintDocument(document) {
         diagnosticCollection.delete(document.uri);
         return;
     }
-    // Count the number of lines in the document
-    const lineCount = document.lineCount;
-    // Get the maximum line count for this document type
-    const maxLines = getMaxLinesForDocument(document, config);
-    // If the line count exceeds the maximum, create a diagnostic
-    if (lineCount > maxLines) {
-        const diagnostics = [];
-        // Create a diagnostic for the first line of the file
-        const range = new vscode.Range(0, 0, 0, document.lineAt(0).text.length);
-        // Build the diagnostic message, including custom message if available
-        let diagnosticMessage = `File has ${lineCount} lines, which exceeds the maximum of ${maxLines} lines${document.languageId ? ` for ${document.languageId} files` : ''}.`;
-        if (config.customQuickFixMessage && config.customQuickFixMessage.trim() !== '') {
-            diagnosticMessage += ` ${config.customQuickFixMessage}`;
+    // Check which measurement type to use
+    if (config.measurementType === 'tokens') {
+        // Get the token count of the document
+        const text = document.getText();
+        const tokenCount = countTokens(text);
+        // Get the maximum token count for this document type
+        const maxTokens = getMaxTokensForDocument(document, config);
+        // If the token count exceeds the maximum, create a diagnostic
+        if (tokenCount > maxTokens) {
+            const diagnostics = [];
+            // Create a diagnostic for the first line of the file
+            const range = new vscode.Range(0, 0, 0, document.lineAt(0).text.length);
+            // Build the diagnostic message, including custom message if available
+            let diagnosticMessage = `File has ${tokenCount} tokens, which exceeds the maximum of ${maxTokens} tokens${document.languageId ? ` for ${document.languageId} files` : ''}.`;
+            if (config.customQuickFixMessage && config.customQuickFixMessage.trim() !== '') {
+                diagnosticMessage += ` ${config.customQuickFixMessage}`;
+            }
+            const diagnostic = new vscode.Diagnostic(range, diagnosticMessage, vscode.DiagnosticSeverity.Error);
+            // Set the source of the diagnostic
+            diagnostic.source = 'File Length Lint';
+            // Add the diagnostic to the array
+            diagnostics.push(diagnostic);
+            // Set the diagnostics for this document
+            diagnosticCollection.set(document.uri, diagnostics);
         }
-        const diagnostic = new vscode.Diagnostic(range, diagnosticMessage, vscode.DiagnosticSeverity.Error);
-        // Set the source of the diagnostic
-        diagnostic.source = 'File Length Lint';
-        // Add the diagnostic to the array
-        diagnostics.push(diagnostic);
-        // Set the diagnostics for this document
-        diagnosticCollection.set(document.uri, diagnostics);
+        else {
+            // Clear any existing diagnostics for this document
+            diagnosticCollection.delete(document.uri);
+        }
     }
     else {
-        // Clear any existing diagnostics for this document
-        diagnosticCollection.delete(document.uri);
+        // Count the number of lines in the document
+        const lineCount = document.lineCount;
+        // Get the maximum line count for this document type
+        const maxLines = getMaxLinesForDocument(document, config);
+        // If the line count exceeds the maximum, create a diagnostic
+        if (lineCount > maxLines) {
+            const diagnostics = [];
+            // Create a diagnostic for the first line of the file
+            const range = new vscode.Range(0, 0, 0, document.lineAt(0).text.length);
+            // Build the diagnostic message, including custom message if available
+            let diagnosticMessage = `File has ${lineCount} lines, which exceeds the maximum of ${maxLines} lines${document.languageId ? ` for ${document.languageId} files` : ''}.`;
+            if (config.customQuickFixMessage && config.customQuickFixMessage.trim() !== '') {
+                diagnosticMessage += ` ${config.customQuickFixMessage}`;
+            }
+            const diagnostic = new vscode.Diagnostic(range, diagnosticMessage, vscode.DiagnosticSeverity.Error);
+            // Set the source of the diagnostic
+            diagnostic.source = 'File Length Lint';
+            // Add the diagnostic to the array
+            diagnostics.push(diagnostic);
+            // Set the diagnostics for this document
+            diagnosticCollection.set(document.uri, diagnostics);
+        }
+        else {
+            // Clear any existing diagnostics for this document
+            diagnosticCollection.delete(document.uri);
+        }
     }
     // Update status bar if this is the active document
     const activeEditor = vscode.window.activeTextEditor;

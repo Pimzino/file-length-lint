@@ -108,7 +108,6 @@
           "default": true,
           "description": "Enable real-time scanning of files in the workspace"
         },
-
         "fileLengthLint.customQuickFixMessage": {
           "type": "string",
           "default": "",
@@ -121,6 +120,28 @@
             "type": "string"
           },
           "description": "List of language IDs for which linting should be disabled. For example: ['markdown', 'json', 'yaml']"
+        },
+        "fileLengthLint.measurementType": {
+          "type": "string",
+          "enum": ["lines", "tokens"],
+          "default": "lines",
+          "description": "Measurement type to use for file length linting. 'lines' counts the number of lines in a file, 'tokens' estimates the number of tokens that would be used by an LLM (using the approximation of 4 characters ≈ 1 token)."
+        },
+        "fileLengthLint.maxTokens": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 1,
+          "description": "Maximum number of tokens allowed in a file before showing a lint error (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token."
+        },
+        "fileLengthLint.languageSpecificMaxTokens": {
+          "type": "object",
+          "default": {
+            "javascript": 2000,
+            "typescript": 2000,
+            "json": 8000,
+            "html": 3000
+          },
+          "description": "Language-specific maximum token counts. Overrides the global maxTokens setting for specified languages (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token."
         }
       }
     }
@@ -134,19 +155,20 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "minimatch": "^9.0.3",
-    "ignore": "^5.3.1"
+    "gpt-tokenizer": "^2.9.0",
+    "ignore": "^5.3.1",
+    "minimatch": "^9.0.3"
   },
   "devDependencies": {
-    "@types/vscode": "^1.93.0",
+    "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/minimatch": "^5.1.2",
+    "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
-    "eslint": "^9.21.0",
-    "typescript": "^5.7.3",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.21.0",
+    "typescript": "^5.7.3"
   }
 }

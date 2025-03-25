@@ -59,6 +59,14 @@ The extension works in several ways:
   <img src="https://raw.githubusercontent.com/Pimzino/file-length-lint/main/images/quickfixsuggestions.gif" width="700" alt="Quick fix suggestions for splitting large files">
 </p>
 
+5. **Customizable exclude patterns**: You can configure which files and directories should be excluded from linting. By default, common binary files, build outputs, and version control directories are excluded.
+
+6. **Respects .gitignore files**: The extension can respect your .gitignore files, ensuring that files and directories you've excluded from version control are also excluded from linting.
+
+7. **Minimal performance impact**: The extension is designed to have minimal impact on your VS Code performance. It uses multi-threading to scan files efficiently and only processes files that haven't been scanned recently.
+
+8. **Token-based linting**: In addition to line count linting, you can also configure the extension to use token counting as an alternative. This is useful for estimating the number of tokens that would be used by an LLM (Large Language Model) when processing your files.
+
 ## Extension Settings
 
 This extension contributes the following settings:
@@ -71,6 +79,9 @@ This extension contributes the following settings:
 * `fileLengthLint.respectGitignore`: Respect .gitignore files when scanning for files to lint (default: true)
 * `fileLengthLint.realtimeScanningEnabled`: Enable real-time scanning of files in the workspace (default: true)
 * `fileLengthLint.customQuickFixMessage`: Custom message to append to the diagnostic and quick fix suggestion (default: ""). For example: "Please consider refactoring this file according to our team guidelines." This message will appear in the Problems panel, in the quick fix suggestion, and in the information message when using the quick fix.
+* `fileLengthLint.measurementType`: Measurement type to use for file length linting. 'lines' counts the number of lines in a file, 'tokens' estimates the number of tokens that would be used by an LLM (using the approximation of 4 characters ≈ 1 token).
+* `fileLengthLint.maxTokens`: Maximum number of tokens allowed in a file before showing a lint error (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token.
+* `fileLengthLint.languageSpecificMaxTokens`: Language-specific maximum token counts. Overrides the global maxTokens setting for specified languages (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token.
 
 ## Why Use This Extension?
 
