@@ -45,7 +45,7 @@
       "properties": {
         "fileLengthLint.maxLines": {
           "type": "number",
-          "default": 300,
+          "default": 500,
           "minimum": 1,
           "description": "Maximum number of lines allowed in a file before showing a lint error"
         },
@@ -54,7 +54,6 @@
           "default": {
             "javascript": 500,
             "typescript": 500,
-            "markdown": 1000,
             "json": 5000,
             "html": 800
           },
