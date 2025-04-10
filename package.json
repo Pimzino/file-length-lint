@@ -2,7 +2,7 @@
   "name": "file-length-lint",
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "Pimzino",
   "icon": "images/icon.png",
   "repository": {
@@ -123,7 +123,10 @@
         },
         "fileLengthLint.measurementType": {
           "type": "string",
-          "enum": ["lines", "tokens"],
+          "enum": [
+            "lines",
+            "tokens"
+          ],
           "default": "lines",
           "description": "Measurement type to use for file length linting. 'lines' counts the number of lines in a file, 'tokens' estimates the number of tokens that would be used by an LLM (using the approximation of 4 characters ≈ 1 token)."
         },
@@ -142,14 +145,25 @@
             "html": 3000
           },
           "description": "Language-specific maximum token counts. Overrides the global maxTokens setting for specified languages (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token."
+        },
+        "fileLengthLint.maxFileSizeInMB": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum file size in MB to process. Files larger than this will be skipped to prevent memory issues. Default is 5MB."
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "npm run compile:client && npm run compile:server && tsc -p ./",
+    "compile:client": "tsc -p ./client/tsconfig.json",
+    "compile:server": "tsc -p ./server/tsconfig.json",
     "watch": "tsc -watch -p ./",
+    "watch:client": "tsc -w -p ./client/tsconfig.json",
+    "watch:server": "tsc -w -p ./server/tsconfig.json",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
@@ -157,7 +171,11 @@
   "dependencies": {
     "gpt-tokenizer": "^2.9.0",
     "ignore": "^5.3.1",
-    "minimatch": "^9.0.3"
+    "minimatch": "^9.0.3",
+    "vscode-languageclient": "^7.0.0",
+    "vscode-languageserver": "^7.0.0",
+    "vscode-languageserver-textdocument": "^1.0.4",
+    "vscode-uri": "^3.0.3"
   },
   "devDependencies": {
     "@types/minimatch": "^5.1.2",

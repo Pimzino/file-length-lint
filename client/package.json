@@ -1,0 +1,14 @@
+{
+  "name": "file-length-lint-client",
+  "description": "File Length Lint - Client",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.93.0"
+  }
+}

@@ -1,0 +1,249 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import {
+  LanguageClient,
+  LanguageClientOptions,
+  ServerOptions,
+  TransportKind
+} from 'vscode-languageclient/node';
+
+/**
+ * Code action provider for file length lint diagnostics
+ */
+class FileLengthLintCodeActionProvider implements vscode.CodeActionProvider {
+  provideCodeActions(document: vscode.TextDocument, range: vscode.Range, context: vscode.CodeActionContext): vscode.CodeAction[] | undefined {
+    // Filter for our diagnostics only
+    const fileLengthDiagnostics = context.diagnostics.filter(diagnostic =>
+      diagnostic.source === 'File Length Lint'
+    );
+
+    if (fileLengthDiagnostics.length === 0) {
+      return undefined;
+    }
+
+    // Get the configuration to check for custom message
+    const config = vscode.workspace.getConfiguration('fileLengthLint');
+    const customQuickFixMessage = config.get<string>('customQuickFixMessage', '');
+
+    // Create the action title with the custom message appended if available
+    let actionTitle = 'Suggest ways to split this file';
+    if (customQuickFixMessage && customQuickFixMessage.trim() !== '') {
+      actionTitle = `Suggest ways to split this file (${customQuickFixMessage})`;
+    }
+
+    // Create a code action for each diagnostic
+    const actions: vscode.CodeAction[] = [];
+
+    for (const diagnostic of fileLengthDiagnostics) {
+      const action = new vscode.CodeAction(actionTitle, vscode.CodeActionKind.QuickFix);
+      action.command = {
+        command: 'fileLengthLint.suggestFileSplit',
+        title: actionTitle,
+        arguments: [document.uri]
+      };
+      action.diagnostics = [diagnostic];
+      action.isPreferred = true;
+      actions.push(action);
+    }
+
+    return actions;
+  }
+}
+
+// Create a diagnostic collection to store file length diagnostics
+const diagnosticCollection = vscode.languages.createDiagnosticCollection('fileLengthLint');
+
+// Language client
+let client: LanguageClient;
+
+/**
+ * Suggest ways to split a file
+ */
+async function suggestFileSplit(uri: vscode.Uri) {
+  // Get the document
+  const document = await vscode.workspace.openTextDocument(uri);
+  
+  // Get the file name
+  const fileName = path.basename(document.fileName);
+  
+  // Show the suggestions
+  vscode.window.showInformationMessage(
+    `Suggestions for splitting ${fileName}:`,
+    'Extract Components',
+    'Create Modules',
+    'Separate by Function'
+  );
+}
+
+/**
+ * Activate the extension
+ */
+export function activate(context: vscode.ExtensionContext) {
+  console.log('File Length Lint extension is now active');
+
+  // Register the code action provider
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionProvider(
+      { pattern: '**/*' },
+      new FileLengthLintCodeActionProvider()
+    )
+  );
+
+  // Register the suggest file split command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('fileLengthLint.suggestFileSplit', (uri: vscode.Uri) => {
+      suggestFileSplit(uri);
+    })
+  );
+
+  // Register the scan workspace command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('fileLengthLint.scanWorkspace', () => {
+      vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'File Length Lint: Scanning workspace files...',
+        cancellable: false
+      }, async (progress) => {
+        progress.report({ increment: 0 });
+        progress.report({ message: 'Scanning workspace files...' });
+        
+        // Force the language server to rescan by changing a setting and then changing it back
+        const config = vscode.workspace.getConfiguration('fileLengthLint');
+        const enabled = config.get('enabled');
+        await config.update('enabled', !enabled, vscode.ConfigurationTarget.Global);
+        await config.update('enabled', enabled, vscode.ConfigurationTarget.Global);
+        
+        progress.report({ increment: 100 });
+        return;
+      });
+    })
+  );
+
+  // Register the reset settings command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('fileLengthLint.resetSettings', async () => {
+      const result = await vscode.window.showWarningMessage(
+        'Are you sure you want to reset all File Length Lint settings to their default values?',
+        { modal: true },
+        'Yes',
+        'No'
+      );
+
+      if (result === 'Yes') {
+        try {
+          const config = vscode.workspace.getConfiguration('fileLengthLint');
+          
+          // Reset all settings to their default values
+          await config.update('maxLines', 300, vscode.ConfigurationTarget.Global);
+          await config.update('languageSpecificMaxLines', {
+            javascript: 500,
+            typescript: 500,
+            markdown: 1000,
+            json: 5000,
+            html: 800
+          }, vscode.ConfigurationTarget.Global);
+          await config.update('measurementType', 'lines', vscode.ConfigurationTarget.Global);
+          await config.update('maxTokens', 2000, vscode.ConfigurationTarget.Global);
+          await config.update('languageSpecificMaxTokens', {
+            javascript: 2000,
+            typescript: 2000,
+            markdown: 4000,
+            json: 8000,
+            html: 3000
+          }, vscode.ConfigurationTarget.Global);
+          await config.update('enabled', true, vscode.ConfigurationTarget.Global);
+          await config.update('exclude', [
+            '**/.git/**',
+            '**/node_modules/**',
+            '**/dist/**',
+            '**/out/**',
+            '**/bin/**',
+            '**/obj/**',
+            '**/.vs/**',
+            '**/.idea/**',
+            '**/.vscode/settings.json',
+            '**/*.min.js',
+            '**/*.min.css',
+            '**/*.dll',
+            '**/*.exe',
+            '**/*.png',
+            '**/*.jpg',
+            '**/*.jpeg',
+            '**/*.gif',
+            '**/*.ico',
+            '**/*.svg',
+            '**/*.woff',
+            '**/*.woff2',
+            '**/*.ttf',
+            '**/*.eot',
+            '**/*.pdf',
+            '**/*.zip',
+            '**/*.tar',
+            '**/*.gz',
+            '**/*.7z'
+          ], vscode.ConfigurationTarget.Global);
+          await config.update('respectGitignore', true, vscode.ConfigurationTarget.Global);
+          await config.update('realtimeScanningEnabled', true, vscode.ConfigurationTarget.Global);
+          await config.update('customQuickFixMessage', '', vscode.ConfigurationTarget.Global);
+          await config.update('disabledLanguages', [], vscode.ConfigurationTarget.Global);
+
+          vscode.window.showInformationMessage('File Length Lint settings have been reset to their default values.');
+        } catch (error) {
+          vscode.window.showErrorMessage(`Error resetting settings: ${error}`);
+        }
+      }
+    })
+  );
+
+  // Server module
+  const serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'));
+  
+  // Server options
+  const serverOptions: ServerOptions = {
+    run: { module: serverModule, transport: TransportKind.ipc },
+    debug: {
+      module: serverModule,
+      transport: TransportKind.ipc,
+      options: { execArgv: ['--nolazy', '--inspect=6009'] }
+    }
+  };
+  
+  // Client options
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: 'file' }], // All files
+    synchronize: {
+      // Notify server about these file changes
+      fileEvents: [
+        vscode.workspace.createFileSystemWatcher('**/.gitignore')
+      ],
+      // Notify server about these configuration changes
+      configurationSection: 'fileLengthLint'
+    },
+    diagnosticCollectionName: 'fileLengthLint'
+  };
+  
+  // Create and start client
+  client = new LanguageClient(
+    'fileLengthLint',
+    'File Length Lint',
+    serverOptions,
+    clientOptions
+  );
+  
+  // Start the client
+  client.start();
+}
+
+/**
+ * Deactivate the extension
+ */
+export function deactivate(): Thenable<void> | undefined {
+  // Clear the diagnostic collection
+  diagnosticCollection.clear();
+
+  if (!client) {
+    return undefined;
+  }
+  return client.stop();
+}

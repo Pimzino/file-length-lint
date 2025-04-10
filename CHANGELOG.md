@@ -2,6 +2,15 @@
 
 All notable changes to the "file-length-lint" extension will be documented in this file.
 
+## [0.0.5] - 2025-04-10
+
+- **Performance Improvements**: Completely redesigned workspace scanning to prevent memory issues on large codebases
+- **Redesigned Workspace Scanning**: We have redesigned extension to follow a language server architecture which will improve reliability and performance.
+- **Smart Binary File Detection**: Automatically skips binary files like executables, images, and other non-text files
+- **Configurable File Size Limit**: Added new setting `fileLengthLint.maxFileSizeInMB` to control maximum file size for processing (default: 5MB)
+- **Batch Processing**: Files are now processed in small batches with memory monitoring to prevent crashes
+- **Improved Error Handling**: Better error recovery and logging for more reliable operation
+
 ## [0.0.4] - 2025-03-25
 
 - Fix bug where worker threads would crash with non-serialized objects

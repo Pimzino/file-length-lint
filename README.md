@@ -34,11 +34,15 @@ A lightweight VS Code extension that checks the number of lines in your files an
 - On-demand workspace scanning command
 - Quick fix suggestions for splitting large files
 - Customizable exclude patterns with sensible defaults for binary files and build outputs
-- Real-time scanning of files using multi-threading for better performance
+- Real-time scanning of files using a high-performance language server implementation
 - Respects .gitignore files (can be disabled) with real-time updates when files change
+- Prevents VS Code extension host crashes by running analysis in a separate process
 - Immediately applies changes to exclusion settings and .gitignore files without requiring a reload
 - Minimal performance impact with optimized file processing
 - Token-based linting for estimating the number of tokens that would be used by an LLM (Large Language Model)
+- **NEW**: Automatic binary file detection to skip files that can't be opened in the editor
+- **NEW**: Configurable file size limit to prevent memory issues with very large files
+- **NEW**: Memory-efficient batch processing for large codebases
 
 ## How It Works
 
@@ -50,7 +54,7 @@ The extension works in several ways:
   <img src="https://raw.githubusercontent.com/Pimzino/file-length-lint/main/images/problemstab.gif" width="700" alt="Problems tab showing file length lint errors">
 </p>
 
-2. **Real-time scanning**: The extension scans files in your workspace in real-time using multi-threading to find files that exceed the maximum line count. This happens without requiring you to open the files, ensuring all problematic files are identified efficiently.
+2. **Real-time scanning**: The extension scans files in your workspace in real-time using a high-performance language server to find files that exceed the maximum line count. This happens without requiring you to open the files, ensuring all problematic files are identified efficiently. Binary files and files larger than the configured size limit are automatically skipped.
 
 3. **Status bar indicator**: The extension shows the current file's line count in the status bar, along with the maximum allowed for that file type. The indicator turns red when the file exceeds the limit.
 
@@ -64,9 +68,13 @@ The extension works in several ways:
 
 6. **Respects .gitignore files**: The extension can respect your .gitignore files, ensuring that files and directories you've excluded from version control are also excluded from linting.
 
-7. **Minimal performance impact**: The extension is designed to have minimal impact on your VS Code performance. It uses multi-threading to scan files efficiently and only processes files that haven't been scanned recently.
+7. **Minimal performance impact**: The extension is designed to have minimal impact on your VS Code performance. It uses a language server to scan files efficiently and only processes files that haven't been scanned recently.
 
 8. **Token-based linting**: In addition to line count linting, you can also configure the extension to use token counting as an alternative. This is useful for estimating the number of tokens that would be used by an LLM (Large Language Model) when processing your files.
+
+9. **Smart binary file detection**: The extension automatically detects and skips binary files like executables, images, and other non-text files that can't be opened in the editor.
+
+10. **Memory-efficient processing**: Files are processed in small batches with memory monitoring to prevent crashes on large codebases. You can also configure the maximum file size to process using the `fileLengthLint.maxFileSizeInMB` setting.
 
 ## Extension Settings
 
@@ -83,6 +91,36 @@ This extension contributes the following settings:
 * `fileLengthLint.measurementType`: Measurement type to use for file length linting. 'lines' counts the number of lines in a file, 'tokens' estimates the number of tokens that would be used by an LLM (using the approximation of 4 characters ≈ 1 token).
 * `fileLengthLint.maxTokens`: Maximum number of tokens allowed in a file before showing a lint error (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token.
 * `fileLengthLint.languageSpecificMaxTokens`: Language-specific maximum token counts. Overrides the global maxTokens setting for specified languages (only used when measurementType is set to 'tokens'). For LLMs, approximately 4 characters ≈ 1 token.
+* `fileLengthLint.maxFileSizeInMB`: Maximum file size in MB to process. Files larger than this will be skipped to prevent memory issues (default: 5MB).
+
+## Language Server Implementation
+
+This extension uses a language server implementation to provide high-performance file analysis without causing VS Code extension host crashes. The language server runs in a separate process, which prevents it from affecting the stability of VS Code.
+
+Key benefits of the language server approach:
+
+- **Improved Performance**: Analysis runs in a separate process, preventing VS Code extension host crashes
+- **Efficient Resource Management**: Better memory usage and cleanup
+- **Incremental Processing**: Only changed files are processed, not the entire workspace
+- **Debounced Validation**: Prevents excessive CPU usage during rapid file changes
+- **Simplified Codebase**: Removed worker threads and complex file scanning logic
+
+### How It Works
+
+The language server implementation follows the Language Server Protocol (LSP) which standardizes the communication between language tooling and code editors. This approach has several advantages:
+
+1. **Separate Process**: The language server runs in a separate process, which prevents it from affecting the stability of VS Code.
+2. **Efficient Communication**: The client and server communicate using a standardized protocol, which reduces overhead.
+3. **Better Resource Management**: The server can manage its own resources independently of the VS Code extension host.
+
+### Architecture
+
+The extension is divided into two parts:
+
+- **Client**: The VS Code extension that communicates with the language server.
+- **Server**: A separate process that analyzes files and reports diagnostics.
+
+This separation allows for better performance and stability, as the server can run intensive operations without affecting the VS Code UI.
 
 ## Why Use This Extension?
 
