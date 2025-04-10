@@ -2,7 +2,7 @@
   "name": "file-length-lint",
   "displayName": "File Length Lint",
   "description": "A lightweight extension to lint files based on their length",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "Pimzino",
   "icon": "images/icon.png",
   "repository": {
@@ -157,14 +157,13 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm run compile:client && npm run compile:server && tsc -p ./",
-    "compile:client": "tsc -p ./client/tsconfig.json",
-    "compile:server": "tsc -p ./server/tsconfig.json",
-    "watch": "tsc -watch -p ./",
-    "watch:client": "tsc -w -p ./client/tsconfig.json",
-    "watch:server": "tsc -w -p ./server/tsconfig.json",
-    "pretest": "npm run compile && npm run lint",
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm run check-types && node esbuild.js --watch",
+    "package": "npm run check-types && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "pretest": "npm run compile-tests && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
@@ -186,6 +185,7 @@
     "@typescript-eslint/parser": "^8.25.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "esbuild": "^0.25.2",
     "eslint": "^9.21.0",
     "typescript": "^5.7.3"
   }

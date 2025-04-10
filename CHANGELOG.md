@@ -2,6 +2,12 @@
 
 All notable changes to the "file-length-lint" extension will be documented in this file.
 
+## [0.0.6] - 2025-04-15
+
+- **Optimized Bundle Size**: Implemented esbuild bundling to reduce extension size by 71% (from 15.34MB to 4.43MB)
+- **Improved Loading Performance**: Reduced file count from 523 to 22 files for faster extension loading
+- **Web Compatibility**: Extension now works in VS Code for Web environments like github.dev and vscode.dev
+
 ## [0.0.5] - 2025-04-10
 
 - **Performance Improvements**: Completely redesigned workspace scanning to prevent memory issues on large codebases

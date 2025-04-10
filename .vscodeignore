@@ -1,6 +1,8 @@
 .vscode/**
 .vscode-test/**
 src/**
+server/src/**
+client/src/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
@@ -10,6 +12,8 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 releases
+node_modules/**
+esbuild.js
 
 # Make sure to include the images directory
 !images/**

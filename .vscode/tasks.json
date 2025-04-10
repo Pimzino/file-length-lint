@@ -5,65 +5,38 @@
 	"tasks": [
 		{
 			"label": "watch",
-			"dependsOn": ["watch:client", "watch:server", "watch:extension"],
-			"problemMatcher": ["$tsc-watch"],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
-		},
-		{
-			"label": "watch:client",
-			"type": "npm",
-			"script": "watch:client",
-			"problemMatcher": ["$tsc-watch"],
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			}
-		},
-		{
-			"label": "watch:server",
-			"type": "npm",
-			"script": "watch:server",
-			"problemMatcher": ["$tsc-watch"],
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			}
-		},
-		{
-			"label": "watch:extension",
 			"type": "npm",
 			"script": "watch",
 			"problemMatcher": ["$tsc-watch"],
 			"isBackground": true,
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"presentation": {
 				"reveal": "never"
 			}
 		},
 		{
 			"label": "compile",
-			"dependsOn": ["compile:client", "compile:server", "compile:extension"],
-			"problemMatcher": ["$tsc"]
-		},
-		{
-			"label": "compile:client",
-			"type": "npm",
-			"script": "compile:client",
-			"problemMatcher": ["$tsc"]
-		},
-		{
-			"label": "compile:server",
-			"type": "npm",
-			"script": "compile:server",
-			"problemMatcher": ["$tsc"]
-		},
-		{
-			"label": "compile:extension",
 			"type": "npm",
 			"script": "compile",
-			"problemMatcher": ["$tsc"]
+			"problemMatcher": ["$tsc"],
+			"group": "build"
+		},
+		{
+			"label": "package",
+			"type": "npm",
+			"script": "package",
+			"problemMatcher": ["$tsc"],
+			"group": "build"
+		},
+		{
+			"label": "check-types",
+			"type": "npm",
+			"script": "check-types",
+			"problemMatcher": ["$tsc"],
+			"group": "build"
 		}
 	]
 }

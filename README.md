@@ -40,9 +40,10 @@ A lightweight VS Code extension that checks the number of lines in your files an
 - Immediately applies changes to exclusion settings and .gitignore files without requiring a reload
 - Minimal performance impact with optimized file processing
 - Token-based linting for estimating the number of tokens that would be used by an LLM (Large Language Model)
-- **NEW**: Automatic binary file detection to skip files that can't be opened in the editor
-- **NEW**: Configurable file size limit to prevent memory issues with very large files
-- **NEW**: Memory-efficient batch processing for large codebases
+- Automatic binary file detection to skip files that can't be opened in the editor
+- Configurable file size limit to prevent memory issues with very large files
+- Memory-efficient batch processing for large codebases
+- **NEW**: Optimized extension bundle size (71% smaller) for faster installation and loading
 
 ## How It Works
 

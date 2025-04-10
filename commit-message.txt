@@ -1,0 +1,22 @@
+feat: implement bundling for improved performance and web compatibility
+
+This commit implements esbuild bundling to significantly improve the extension's
+performance and compatibility:
+
+- Reduced extension size by 71% (from 15.34MB to 4.43MB)
+- Decreased file count from 523 to 22 files for faster loading
+- Added web compatibility for VS Code for Web environments
+- Simplified build process with optimized npm scripts
+- Updated documentation to reflect the improvements
+
+Technical changes:
+- Added esbuild as a development dependency
+- Created esbuild.js configuration for bundling both extension and server
+- Updated package.json scripts for streamlined development workflow
+- Optimized .vscodeignore to exclude unnecessary files
+- Updated VS Code tasks configuration for better development experience
+- Bumped version to 0.0.6
+
+This change addresses the VS Code warning about bundling extensions and
+improves the overall user experience by making the extension load faster
+and consume less disk space.
