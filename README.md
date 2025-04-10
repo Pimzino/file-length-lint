@@ -43,7 +43,7 @@ A lightweight VS Code extension that checks the number of lines in your files an
 - Automatic binary file detection to skip files that can't be opened in the editor
 - Configurable file size limit to prevent memory issues with very large files
 - Memory-efficient batch processing for large codebases
-- **NEW**: Optimized extension bundle size (71% smaller) for faster installation and loading
+- **NEW**: Optimized extension bundle size (67% smaller) for faster installation and loading
 
 ## How It Works
 

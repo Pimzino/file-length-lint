@@ -1,7 +1,18 @@
 const esbuild = require('esbuild');
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+
+// Make sure the output directories exist
+if (!fs.existsSync('out')) {
+  fs.mkdirSync('out', { recursive: true });
+}
+if (!fs.existsSync('server/out')) {
+  fs.mkdirSync('server/out', { recursive: true });
+}
 
 async function main() {
   // Build the extension
@@ -19,26 +30,30 @@ async function main() {
     plugins: [esbuildProblemMatcherPlugin]
   });
 
-  // Build the server
-  const serverCtx = await esbuild.context({
-    entryPoints: ['server/src/server.ts'],
-    bundle: true,
-    format: 'cjs',
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    platform: 'node',
-    outfile: 'server/out/server.js',
-    external: ['vscode', 'vscode-languageserver', 'vscode-languageserver-textdocument'],
-    logLevel: 'warning',
-    plugins: [esbuildProblemMatcherPlugin]
-  });
+  // Build the server with TypeScript compiler
+  console.log('Building server with tsc...');
+  try {
+    execSync('tsc -p ./server/tsconfig.json', { stdio: 'inherit' });
+    console.log('Server build completed successfully');
+  } catch (error) {
+    console.error('Error building server:', error);
+    process.exit(1);
+  }
 
   if (watch) {
-    await Promise.all([extensionCtx.watch(), serverCtx.watch()]);
+    // In watch mode, start the extension watcher
+    await extensionCtx.watch();
+
+    // For the server, we'll use tsc watch mode
+    console.log('Starting server watch mode...');
+    try {
+      execSync('tsc -w -p ./server/tsconfig.json', { stdio: 'inherit' });
+    } catch (error) {
+      console.error('Error in server watch mode:', error);
+    }
   } else {
-    await Promise.all([extensionCtx.rebuild(), serverCtx.rebuild()]);
-    await Promise.all([extensionCtx.dispose(), serverCtx.dispose()]);
+    await extensionCtx.rebuild();
+    await extensionCtx.dispose();
   }
 }
 

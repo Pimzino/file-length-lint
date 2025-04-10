@@ -158,10 +158,11 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "npm run check-types && node esbuild.js",
+    "compile": "npm run check-types && node esbuild.js && npm run copy-server-deps",
     "check-types": "tsc --noEmit",
     "watch": "npm run check-types && node esbuild.js --watch",
-    "package": "npm run check-types && node esbuild.js --production",
+    "package": "npm run check-types && node esbuild.js --production && npm run copy-server-deps",
+    "copy-server-deps": "cd server && npm install --production && cd ..",
     "compile-tests": "tsc -p . --outDir out",
     "pretest": "npm run compile-tests && npm run lint",
     "lint": "eslint src",

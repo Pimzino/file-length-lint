@@ -12,8 +12,11 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 releases
-node_modules/**
 esbuild.js
+node_modules/**
+
+# Don't exclude server node_modules
+!server/node_modules/**
 
 # Make sure to include the images directory
 !images/**
